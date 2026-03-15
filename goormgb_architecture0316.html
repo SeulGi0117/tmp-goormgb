@@ -1,0 +1,415 @@
+
+<style>
+  body { background: #0d0d0d; margin: 0; padding: 0; }
+  * { box-sizing: border-box; }
+
+  .canvas {
+    background: #111111;
+    border-radius: 12px;
+    padding: 32px 28px 36px;
+    position: relative;
+    font-family: -apple-system, 'Pretendard', 'Noto Sans KR', sans-serif;
+    overflow: hidden;
+    min-height: 640px;
+  }
+
+  /* dot grid background */
+  .canvas::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: radial-gradient(circle, #2a2a2a 1px, transparent 1px);
+    background-size: 24px 24px;
+    pointer-events: none;
+  }
+
+  /* ── GROUP BOXES ── */
+  .group {
+    position: absolute;
+    border-radius: 12px;
+    border: 1.5px solid;
+  }
+  .group-label {
+    position: absolute;
+    top: -11px; left: 14px;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: .08em;
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .group-label::before { content: '⊡'; font-size: 11px; }
+
+  .g-client  { border-color: #3a3a3a; background: rgba(255,255,255,.025); }
+  .g-client .group-label  { background: #1e1e1e; color: #888; }
+
+  .g-gateway { border-color: #1e4d8c; background: rgba(30,77,140,.08); }
+  .g-gateway .group-label { background: #0d2547; color: #5b9ef4; }
+
+  .g-services{ border-color: #1a5c3a; background: rgba(26,92,58,.08); }
+  .g-services .group-label{ background: #0b2e1d; color: #4ec98a; }
+
+  .g-redis1  { border-color: #6b4c12; background: rgba(107,76,18,.10); }
+  .g-redis1 .group-label { background: #3a2908; color: #f5a623; }
+
+  .g-redis2  { border-color: #4a2070; background: rgba(74,32,112,.10); }
+  .g-redis2 .group-label { background: #250f3a; color: #b47ef5; }
+
+  .g-db      { border-color: #0f4a3a; background: rgba(15,74,58,.10); }
+  .g-db .group-label { background: #072420; color: #3dc9a0; }
+
+  /* ── SERVICE NODE ── */
+  .node {
+    position: absolute;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 7px; cursor: pointer;
+  }
+  .node-icon {
+    width: 52px; height: 52px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    transition: transform .15s, box-shadow .15s;
+    position: relative;
+    border: 1.5px solid rgba(255,255,255,.08);
+  }
+  .node:hover .node-icon {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  }
+  .node-label {
+    font-size: 10px; font-weight: 600;
+    color: #c8c8c0;
+    text-align: center; line-height: 1.3;
+    max-width: 72px;
+    letter-spacing: .01em;
+  }
+
+  /* icon colors */
+  .ic-user    { background: #2a2a2a; }
+  .ic-gateway { background: #1a4fa0; }
+  .ic-auth    { background: #7c3aed; }
+  .ic-queue   { background: #c2410c; }
+  .ic-seat    { background: #065f46; }
+  .ic-order   { background: #9d174d; }
+  .ic-common  { background: #374151; }
+  .ic-redis1  { background: #92400e; }
+  .ic-redis2  { background: #581c87; }
+  .ic-pg      { background: #1e3a5f; }
+  .ic-kakao   { background: #3d2c00; }
+  .ic-kafka   { background: #1a1a1a; border-color: #444 !important; }
+  .ic-cdn     { background: #064e3b; }
+  .ic-nlb     { background: #1e3a5f; }
+  .ic-istio   { background: #312e81; }
+
+  /* ── SVG ARROWS ── */
+  .arrow-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  /* ── LEGEND ── */
+  .legend {
+    position: absolute;
+    bottom: 14px; right: 18px;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; color: #666; font-weight: 500;
+  }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+  /* ── HEADER ── */
+  .canvas-header {
+    position: relative; z-index: 10;
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 20px;
+  }
+  .canvas-title {
+    font-size: 13px; font-weight: 700; color: #e0ddd5;
+    letter-spacing: .02em;
+  }
+  .canvas-sub { font-size: 11px; color: #555; }
+  .breadcrumb { display: flex; align-items: center; gap: 6px; }
+  .bc-sep { color: #444; }
+
+  /* tab buttons top right */
+  .canvas-tabs {
+    margin-left: auto;
+    display: flex; gap: 0;
+    border: 1px solid #2a2a2a;
+    border-radius: 7px; overflow: hidden;
+  }
+  .canvas-tab {
+    padding: 5px 14px;
+    font-size: 11px; font-weight: 600;
+    color: #555; background: #161616;
+    border: none; cursor: pointer;
+    border-right: 1px solid #2a2a2a;
+    font-family: inherit;
+    transition: color .1s, background .1s;
+  }
+  .canvas-tab:last-child { border-right: none; }
+  .canvas-tab.on { background: #222; color: #e0ddd5; }
+
+  /* tooltip */
+  .tooltip {
+    display: none;
+    position: absolute;
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 11px; color: #ccc;
+    min-width: 160px;
+    z-index: 100;
+    line-height: 1.6;
+    pointer-events: none;
+    top: -8px; left: 64px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.6);
+  }
+  .tooltip strong { color: #fff; display: block; margin-bottom: 3px; font-size: 12px; }
+  .node:hover .tooltip { display: block; }
+</style>
+
+<div style="background:#0d0d0d;padding:16px;border-radius:14px">
+<div class="canvas" id="canvas" style="height:660px">
+
+  <!-- HEADER -->
+  <div class="canvas-header">
+    <div class="breadcrumb">
+      <span style="font-size:12px;color:#e05b5b;font-weight:800">⬛</span>
+      <span class="canvas-sub">표고 (Traffic-Master)</span>
+      <span class="bc-sep">/</span>
+      <span class="canvas-title">백엔드 시스템 아키텍처</span>
+    </div>
+    <div class="canvas-tabs">
+      <button class="canvas-tab">Note</button>
+      <button class="canvas-tab on">Canvas</button>
+    </div>
+  </div>
+
+  <!-- SVG ARROWS (drawn first, behind nodes) -->
+  <svg class="arrow-svg" viewBox="0 0 860 620" preserveAspectRatio="none">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+        <path d="M1 1L9 5L1 9" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke="context-stroke"/>
+      </marker>
+      <marker id="ah-dash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+        <path d="M1 1L9 5L1 9" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke="#666"/>
+      </marker>
+    </defs>
+
+    <!-- 사용자 → CDN → NLB → Istio → Gateway (top flow) -->
+    <line x1="60"  y1="92"  x2="118" y2="92"  stroke="#555" stroke-width="1.5" marker-end="url(#ah)"/>
+    <line x1="178" y1="92"  x2="238" y2="92"  stroke="#555" stroke-width="1.5" marker-end="url(#ah)"/>
+    <line x1="298" y1="92"  x2="358" y2="92"  stroke="#555" stroke-width="1.5" marker-end="url(#ah)"/>
+    <line x1="418" y1="92"  x2="490" y2="92"  stroke="#5b9ef4" stroke-width="2" marker-end="url(#ah)"/>
+
+    <!-- Gateway → 4 services (fan out) -->
+    <path d="M 540 116 L 540 148 L 134 148 L 134 172" stroke="#5b9ef4" stroke-width="1.8" fill="none" marker-end="url(#ah)" stroke-dasharray="5 3"/>
+    <path d="M 540 116 L 540 148 L 294 148 L 294 172" stroke="#f5a623" stroke-width="1.8" fill="none" marker-end="url(#ah)" stroke-dasharray="5 3"/>
+    <path d="M 540 116 L 540 148 L 454 148 L 454 172" stroke="#4ec98a" stroke-width="1.8" fill="none" marker-end="url(#ah)" stroke-dasharray="5 3"/>
+    <path d="M 540 116 L 540 148 L 614 148 L 614 172" stroke="#f472b6" stroke-width="1.8" fill="none" marker-end="url(#ah)" stroke-dasharray="5 3"/>
+
+    <!-- Auth → Redis2 (refresh_token) -->
+    <path d="M 134 246 L 134 310 L 174 310" stroke="#b47ef5" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+
+    <!-- Queue → Redis1 -->
+    <path d="M 294 246 L 294 310 L 334 310" stroke="#f5a623" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+
+    <!-- Seat → Redis2 (block_lock) -->
+    <path d="M 454 246 L 454 380 L 490 380" stroke="#b47ef5" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+
+    <!-- Order → PostgreSQL -->
+    <path d="M 614 246 L 614 430 L 650 430" stroke="#3dc9a0" stroke-width="1.5" fill="none" marker-end="url(#ah)"/>
+
+    <!-- Auth → PostgreSQL (users) -->
+    <path d="M 134 246 L 134 480 L 650 480" stroke="#3dc9a0" stroke-width="1.2" fill="none" marker-end="url(#ah)" stroke-dasharray="4 3" opacity=".6"/>
+
+    <!-- Auth → Kakao -->
+    <path d="M 160 210 L 760 210 L 760 340" stroke="#f5a623" stroke-width="1.4" fill="none" marker-end="url(#ah)" stroke-dasharray="4 3" opacity=".7"/>
+
+    <!-- Seat → Redis1 (seat:preference) -->
+    <path d="M 454 246 L 454 270 L 370 270 L 370 310" stroke="#f5a623" stroke-width="1.2" fill="none" marker-end="url(#ah)" stroke-dasharray="4 3" opacity=".6"/>
+
+    <!-- common-core used by all services (subtle) -->
+    <line x1="134" y1="248" x2="134" y2="274" stroke="#555" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="294" y1="248" x2="294" y2="274" stroke="#555" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="454" y1="248" x2="454" y2="274" stroke="#555" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="614" y1="248" x2="614" y2="274" stroke="#555" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="134" y1="274" x2="614" y2="274" stroke="#444" stroke-width="1" stroke-dasharray="3 3"/>
+    <path d="M 374 274 L 374 284" stroke="#444" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#ah-dash)"/>
+  </svg>
+
+  <!-- ══ GROUP: 외부접근 ══ -->
+  <div class="group g-client" style="left:16px;top:58px;width:478px;height:58px">
+    <span class="group-label" style="font-size:9px">외부 접근 레이어</span>
+  </div>
+
+  <!-- 사용자 -->
+  <div class="node" style="left:24px;top:64px;z-index:10">
+    <div class="node-icon ic-user">👤</div>
+    <div class="node-label">사용자<br>Web/Mobile</div>
+    <div class="tooltip"><strong>사용자</strong>Web / Mobile 클라이언트</div>
+  </div>
+  <!-- CDN -->
+  <div class="node" style="left:118px;top:64px;z-index:10">
+    <div class="node-icon ic-cdn">🌐</div>
+    <div class="node-label">Vercel CDN<br>DDoS 방어</div>
+    <div class="tooltip"><strong>Vercel CDN</strong>DDoS 방어 · 정적 자산 서빙</div>
+  </div>
+  <!-- NLB -->
+  <div class="node" style="left:238px;top:64px;z-index:10">
+    <div class="node-icon ic-nlb">⚖️</div>
+    <div class="node-label">NLB<br>접근 제한</div>
+    <div class="tooltip"><strong>NLB</strong>Network Load Balancer · 접근 제한</div>
+  </div>
+  <!-- Istio -->
+  <div class="node" style="left:358px;top:64px;z-index:10">
+    <div class="node-icon ic-istio">🔐</div>
+    <div class="node-label">Istio Gateway<br>WAF + mTLS</div>
+    <div class="tooltip"><strong>Istio Gateway</strong>WAF · mTLS · 서비스 메시</div>
+  </div>
+
+  <!-- ══ GROUP: API Gateway ══ -->
+  <div class="group g-gateway" style="left:480px;top:58px;width:136px;height:68px">
+    <span class="group-label">API GATEWAY</span>
+  </div>
+  <div class="node" style="left:502px;top:62px;z-index:10">
+    <div class="node-icon ic-gateway">🔀</div>
+    <div class="node-label">API-Gateway<br>:8085</div>
+    <div class="tooltip"><strong>API-Gateway :8085</strong>JWT 중앙 검증 (RSA-256)<br>라우팅 · CORS · Swagger</div>
+  </div>
+
+  <!-- ══ GROUP: 마이크로서비스 ══ -->
+  <div class="group g-services" style="left:60px;top:158px;width:610px;height:120px">
+    <span class="group-label">MICROSERVICES</span>
+  </div>
+
+  <!-- Auth-Guard -->
+  <div class="node" style="left:100px;top:172px;z-index:10">
+    <div class="node-icon ic-auth">🛡️</div>
+    <div class="node-label">Auth-Guard<br>:8080</div>
+    <div class="tooltip"><strong>Auth-Guard :8080</strong>Kakao OAuth · JWT 발급<br>RTR · 블랙리스트</div>
+  </div>
+  <!-- Queue -->
+  <div class="node" style="left:260px;top:172px;z-index:10">
+    <div class="node-icon ic-queue">⏳</div>
+    <div class="node-label">Queue<br>:8081</div>
+    <div class="tooltip"><strong>Queue :8081</strong>대기열 진입/폴링<br>Admission Token 발급</div>
+  </div>
+  <!-- Seat -->
+  <div class="node" style="left:420px;top:172px;z-index:10">
+    <div class="node-icon ic-seat">💺</div>
+    <div class="node-label">Seat<br>:8082</div>
+    <div class="tooltip"><strong>Seat :8082</strong>추천 블록 계산<br>연석/준연석 배정 · 분산 락</div>
+  </div>
+  <!-- Order-Core -->
+  <div class="node" style="left:580px;top:172px;z-index:10">
+    <div class="node-icon ic-order">🎫</div>
+    <div class="node-label">Order-Core<br>:8083</div>
+    <div class="tooltip"><strong>Order-Core :8083</strong>주문 생성 · Mock 결제<br>마이페이지 · 온보딩</div>
+  </div>
+
+  <!-- common-core (below services, connecting line style) -->
+  <div class="node" style="left:330px;top:286px;z-index:10">
+    <div class="node-icon ic-common" style="width:44px;height:44px;font-size:18px;border-radius:8px">📦</div>
+    <div class="node-label">common-core</div>
+    <div class="tooltip"><strong>common-core</strong>공통 엔티티 · 인증 필터<br>Redis/JPA/Swagger 설정</div>
+  </div>
+
+  <!-- ══ GROUP: Redis #1 Queue ══ -->
+  <div class="group g-redis1" style="left:60px;top:298px;width:288px;height:160px">
+    <span class="group-label">REDIS #1 — QUEUE 전용</span>
+  </div>
+  <!-- Redis1 keys -->
+  <div class="node" style="left:80px;top:318px;z-index:10">
+    <div class="node-icon ic-redis1">🗂️</div>
+    <div class="node-label">queue:wait<br>ZSET</div>
+    <div class="tooltip"><strong>queue:wait:{matchId}</strong>ZSET · 대기열 순서 보장<br>score = timestamp</div>
+  </div>
+  <div class="node" style="left:180px;top:318px;z-index:10">
+    <div class="node-icon ic-redis1">⚡</div>
+    <div class="node-label">queue:ready<br>TTL 30초</div>
+    <div class="tooltip"><strong>queue:ready:{m}:{u}</strong>STRING · Admission Token 저장<br>TTL 30초 · 일회용</div>
+  </div>
+  <div class="node" style="left:118px;top:402px;z-index:10">
+    <div class="node-icon ic-redis1">⭐</div>
+    <div class="node-label">seat:preference<br>TTL 900초</div>
+    <div class="tooltip"><strong>seat:preference:{m}:{u}</strong>STRING · 좌석 선호도 캐시<br>TTL 900초</div>
+  </div>
+
+  <!-- ══ GROUP: Redis #2 Auth/Lock ══ -->
+  <div class="group g-redis2" style="left:380px;top:298px;width:298px;height:160px">
+    <span class="group-label">REDIS #2 — AUTH/LOCK 전용</span>
+  </div>
+  <div class="node" style="left:398px;top:318px;z-index:10">
+    <div class="node-icon ic-redis2">🔑</div>
+    <div class="node-label">refresh_token<br>TTL 7일</div>
+    <div class="tooltip"><strong>refresh_token:{jti}</strong>STRING · RTR 패턴<br>TTL 7일</div>
+  </div>
+  <div class="node" style="left:498px;top:318px;z-index:10">
+    <div class="node-icon ic-redis2">🚫</div>
+    <div class="node-label">token_blacklist<br>TTL 잔여시간</div>
+    <div class="tooltip"><strong>token_blacklist:{jti}</strong>STRING · 로그아웃 블랙리스트<br>TTL 잔여시간</div>
+  </div>
+  <div class="node" style="left:438px;top:402px;z-index:10">
+    <div class="node-icon ic-redis2">🔒</div>
+    <div class="node-label">block_lock<br>SETNX TTL 5초</div>
+    <div class="tooltip"><strong>block_lock:{blockId}</strong>STRING · 분산 락 (SETNX)<br>TTL 5초 · 좌석 동시성 제어</div>
+  </div>
+
+  <!-- ══ GROUP: PostgreSQL ══ -->
+  <div class="group g-db" style="left:60px;top:488px;width:618px;height:100px">
+    <span class="group-label">POSTGRESQL — goormgb</span>
+  </div>
+  <div class="node" style="left:88px;top:506px;z-index:10">
+    <div class="node-icon ic-pg">👤</div>
+    <div class="node-label">users<br>user_sns</div>
+    <div class="tooltip"><strong>Auth-Guard 소유</strong>users · user_sns<br>dev_users · withdrawal_requests</div>
+  </div>
+  <div class="node" style="left:218px;top:506px;z-index:10">
+    <div class="node-icon ic-pg">💺</div>
+    <div class="node-label">seats · blocks<br>seat_holds</div>
+    <div class="tooltip"><strong>Seat 소유</strong>seats · blocks · sections<br>match_seats · seat_holds · price_policies</div>
+  </div>
+  <div class="node" style="left:368px;top:506px;z-index:10">
+    <div class="node-icon ic-pg">📋</div>
+    <div class="node-label">orders<br>payments</div>
+    <div class="tooltip"><strong>Order-Core 소유</strong>orders · order_seats · payments<br>cash_receipts · qr_tokens</div>
+  </div>
+  <div class="node" style="left:502px;top:506px;z-index:10">
+    <div class="node-icon ic-pg">⚾</div>
+    <div class="node-label">matches · clubs<br>stadiums</div>
+    <div class="tooltip"><strong>common-core 소유</strong>matches · clubs · stadiums<br>team_season_stats</div>
+  </div>
+
+  <!-- Kakao OAuth (외부) -->
+  <div class="node" style="left:728px;top:326px;z-index:10">
+    <div class="node-icon ic-kakao">💬</div>
+    <div class="node-label">Kakao OAuth<br>외부 서버</div>
+    <div class="tooltip"><strong>Kakao OAuth Server</strong>소셜 로그인 인증 외부 의존성</div>
+  </div>
+
+  <!-- Kafka (향후) -->
+  <div class="node" style="left:728px;top:490px;z-index:10">
+    <div class="node-icon ic-kafka" style="border:1.5px dashed #555">⚙️</div>
+    <div class="node-label" style="color:#555">Kafka<br>향후 도입</div>
+    <div class="tooltip"><strong>Kafka (향후 도입)</strong>seat.held · order.created<br>payment.succeeded 이벤트</div>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#5b9ef4"></div>Gateway 연결</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f5a623"></div>Queue 전용 Redis</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#b47ef5"></div>Auth/Lock 전용 Redis</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3dc9a0"></div>PostgreSQL</div>
+    <div class="legend-item" style="opacity:.5"><div class="legend-dot" style="background:#555;border:1px dashed #888"></div>향후 예정</div>
+  </div>
+
+</div>
+</div>
